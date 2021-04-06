@@ -30,13 +30,13 @@ If we fix the weights of the Universal Sentence Encoder and train a model that c
 We use the Yelp polarity [dataset](https://www.tensorflow.org/datasets/catalog/yelp_polarity_reviews) for training as it is closest to our use-case.
 Using Tensorflow datasets it's as easy as running
 
-``` {.bash}
+```bash
 tfds build yelp_polarity_reviews
 ```
 
 in a terminal. This will download and prepare the data. After that, we can use it in our Python script:
 
-``` {.python}
+```python
 train, val, test = tfds.load(name="yelp_polarity_reviews", 
                              split=('train[:80%]', 'train[80%:]', 'test'),
                              as_supervised=True,
@@ -46,7 +46,7 @@ train, val, test = tfds.load(name="yelp_polarity_reviews",
 Next, we need to instantiate the Universal Sentence Encoder.
 Keras offers a convenient method to embed models from Tensorflow Hub directly into a model:
 
-``` {.python}
+```python
 # model
 text_input_USE = tf.keras.layers.Input(shape=(), dtype=tf.string, name="USE_input")
 preprocessor = hub.KerasLayer("https://tfhub.dev/google/universal-sentence-encoder-cmlm/multilingual-preprocess/2",
@@ -63,7 +63,7 @@ The authors also [suggest](https://tfhub.dev/google/universal-sentence-encoder-c
 However, we had to adjust it slightly, such that it uses the tensorflow primitives, instead of numpy.
 With that, it can be embedded directly into a Lambda Layer which reads the `outputs` from the Universal Sentence Encoder.
 
-``` {.python}
+```python
 # taken and adapted from:
 # https://tfhub.dev/google/universal-sentence-encoder-cmlm/multilingual-base-br/1
 def normalization(embeds):
@@ -80,7 +80,7 @@ Originally, they are trained on several different languages simultaneously to fo
 We do not want to loose that property which is why we fix their weights (see the `trainable=False` property of the output above).
 In order to give the model a little "brain muscle" to learn to understand the embedding, we add a dense layer before the classifier:
 
-``` {.python}
+```python
 sentiment_mdl_USE = tf.keras.layers.Dense(128, name="sentiment_mdl")(normalized)
 classifier = tf.keras.layers.Dense(1, name="classifier")(sentiment_mdl_USE)
 
@@ -94,7 +94,7 @@ model.summary()
 ```
 
 To recap, the complete model code looks like this now:
-```{.python}
+```python
 # taken and adapted from:
 # https://tfhub.dev/google/universal-sentence-encoder-cmlm/multilingual-base-br/1
 def normalization(embeds):
@@ -151,7 +151,7 @@ The summary generates the following output:
 
 Now, we are ready for training:
 
-``` {.python}
+```python
 # train on yelp data
 history = model.fit(
   train.shuffle(10000).batch(128).prefetch(tf.data.AUTOTUNE),
@@ -176,7 +176,7 @@ Therefore, the validation accuracy closely matches the training accuracy (if it 
 Nice!
 
 Let's see what the evaluation on the test set yields:
-``` {.python}
+```python
 model.evaluate(test.batch(128))
 ```
 
@@ -188,7 +188,7 @@ Good, similar values to what we saw during training!
 Of course, there is a million things one could do to improve the model (label smoothing, larger models, other activations, learning rate schedule, ...) but the real question here is: Does it generalize to other languages well enough, such that we can classify the sentiment of non-English sentences?
 Since the last layer of our model has no activation we apply a sigmoid function on its output.
 This could also be done directly in the model, as in [this](https://www.tensorflow.org/tutorials/keras/text_classification#export_the_model) example but for the sake of brevity we just apply it inside a function:
-```{.python}
+```python
 def get_sentiment(text):
   res = tf.sigmoid(model.predict([text]))[0][0].numpy()
   return res, "positive" if res > 0.5 else "negative"
@@ -197,7 +197,7 @@ def get_sentiment(text):
 Let's test some phrases (German, French, and English phrases are grouped together):
 
 #### True negatives
-``` {.python}
+```python
 get_sentiment("This really was a lousy restaurant.")
 # (0.00044415292, 'negative')
 get_sentiment("Das war wirklich ein mieses Restaurant.")
@@ -221,7 +221,7 @@ get_sentiment("Même si le service était tout à fait correct, attendre si long
 ```
 
 #### True positives
-``` {.python}
+```python
 get_sentiment("Great service. I can recommend this place!")
 # (0.9997924, 'positive')
 get_sentiment("Großartiger service. Kann ich empfehlen!")
@@ -238,7 +238,7 @@ get_sentiment("La nouvelle succursale est facilement accessible.")
 ```
 
 #### False negatives
-``` {.python}
+```python
 get_sentiment("We were given very good advice. We couldn't wish for more.")
 # (0.23018356, 'negative')
 get_sentiment("Wir wurden sehr gut beraten. Das hätten wir uns nicht besser wünschen können.")
